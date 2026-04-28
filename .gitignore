@@ -1,0 +1,40 @@
+# Credentials — never publish
+.env
+*.pem
+
+# Personal data
+signals_log.json
+
+# Scratch / diagnostic scripts
+Test_script.py
+diag.py
+
+# PDFs (copyright + personal)
+*.pdf
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
