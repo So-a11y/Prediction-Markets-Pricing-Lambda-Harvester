@@ -2,12 +2,13 @@
 Empirical parameters calibrated from Yang (2026)
 "Pricing Prediction Markets: Incomplete Markets, Selection Rules, and Risk Premia"
 University of Illinois Urbana-Champaign, Working Paper April 2026
+
+Yang, Y. (2026). Pricing Prediction Markets: Incomplete Markets, Selection Rules, and Risk Premia. Working Paper
 """
 
-# ── Global λ estimates by platform (Table 18, Yang 2026) ──────────────────────
+# ── Global λ estimates (Table 18, Yang 2026) ──────────────────────────────────
 LAMBDA_POLYMARKET = 0.176       # MLE, N=2,460 (SE=0.027, p=7.1e-11)
 LAMBDA_POLYMARKET_FULL = 0.166  # N=13,738 (SE=0.011)
-LAMBDA_KALSHI = 0.187           # N=271,699 (SE=0.003)
 
 # ── Category-level λ (Table 13, Yang 2026) ────────────────────────────────────
 LAMBDA_BY_CATEGORY = {
@@ -46,9 +47,9 @@ LAMBDA_DECAY_GAMMA2 = 0.151   # quadratic term (slows near resolution)
 # ── Execution filters (plan document + Yang 2026 evidence) ────────────────────
 MIN_DAYS_TO_RESOLUTION = 7          # λ̂ ≈ 0.444 for >7d vs ~0.12 for 1-3d
 PRICE_LOWER_BOUND = 0.05            # avoid boundary artifacts (logit noise)
-PRICE_UPPER_BOUND = 0.50            # widened for Kalshi (original Polymarket value: 0.20)
-MAX_VOLUME_USD = 100_000            # widened for Kalshi (original Polymarket value: 10_000)
-MIN_VOLUME_USD = 0                  # widened for Kalshi (original Polymarket value: 100)
+PRICE_UPPER_BOUND = 0.50            # longshot focus; FLB strongest below 0.20 but widened for coverage
+MAX_VOLUME_USD = 10_000             # wedge competed away above $10K (Table 14)
+MIN_VOLUME_USD = 100                # minimum liquidity floor
 MIN_PRICE_HISTORY_HOURS = 10       # minimum hourly obs for EIV estimate
 PRICE_HISTORY_HOURS = 48            # lookback window for EIV calculation
 

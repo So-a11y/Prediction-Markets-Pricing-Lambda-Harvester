@@ -22,8 +22,6 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from lambda_harvester.scanner import LambdaScanner, ContractAnalysis
 from lambda_harvester.backtest import LambdaBacktester, BacktestResults
 from lambda_harvester.polymarket_client import PolymarketClient
-from lambda_harvester.kalshi_client import KalshiClient
-from lambda_harvester.kalshi_matcher import KalshiMatcher
 from lambda_harvester.signal_tracker import save_signals, check_outcomes, print_outcomes_report
 from lambda_harvester.config import (
     MIN_DAYS_TO_RESOLUTION,
@@ -217,12 +215,6 @@ def print_backtest_results(results: BacktestResults):
     print()
 
 
-def _build_client(platform: str):
-    if platform == "kalshi":
-        return KalshiClient()
-    return PolymarketClient()
-
-
 def run_backtest(client, max_markets: int, history_days: int, no_ema: bool, quiet: bool):
     print_header()
     print(f"  [BACKTEST MODE — {history_days}d price history window, up to {max_markets} resolved markets]\n")
@@ -289,10 +281,6 @@ def main():
         description="λ-Harvesting Bot — scans prediction markets for Wang Transform shorting opportunities."
     )
     parser.add_argument(
-        "--platform", choices=["polymarket", "kalshi"], default="polymarket",
-        help="Which platform to use (default: polymarket)"
-    )
-    parser.add_argument(
         "--max-markets", type=int, default=3000, metavar="N",
         help="Maximum number of active markets to fetch (default: 3000)"
     )
@@ -341,10 +329,6 @@ def main():
         help="Path to signals log file (default: signals_log.json)"
     )
     parser.add_argument(
-        "--kalshi-only", action="store_true",
-        help="Only show opportunities that have a matching Kalshi market (requires --platform kalshi)"
-    )
-    parser.add_argument(
         "--categories", type=str, default=None, metavar="CAT1,CAT2,...",
         help="Comma-separated list of categories to include (e.g. crypto,tech,politics). "
              "Valid: crypto, tech, politics, sports, science, other"
@@ -357,17 +341,12 @@ def main():
 
     signals_path = Path(args.signals_file)
 
+    client = PolymarketClient()
+
     if args.check_outcomes:
-        client = _build_client(args.platform)
         records = check_outcomes(client, path=signals_path)
         print_outcomes_report(records)
         return
-
-    client = _build_client(args.platform)
-    # KalshiMatcher only needed when scanning Polymarket and cross-referencing Kalshi
-    kalshi_matcher = KalshiMatcher(verbose=not args.quiet) if (
-        args.platform == "polymarket" and (getattr(args, "kalshi_only", False) or getattr(args, "categories", None))
-    ) else None
 
     if args.backtest:
         run_backtest(
@@ -380,9 +359,6 @@ def main():
         return
 
     print_header()
-    print(f"  [SCANNING: {args.platform.upper()}]\n")
-    if kalshi_matcher:
-        print("  [CROSS-PLATFORM: Polymarket signals → Kalshi equivalents]\n")
     print_filter_summary()
 
     scanner = LambdaScanner(
@@ -409,23 +385,6 @@ def main():
             print("  Try removing --categories or changing the list.")
             sys.exit(0)
 
-    # Pre-compute Kalshi matches so we can filter and display without double-querying
-    kalshi_matches: dict[str, tuple] = {}
-    if kalshi_matcher:
-        for a in results:
-            m = kalshi_matcher.find_equivalent(a.question)
-            kalshi_matches[a.market_id] = m  # None if no match
-
-    # --kalshi-only: drop signals without a Kalshi equivalent
-    if args.kalshi_only:
-        before = len(results)
-        results = [a for a in results if kalshi_matches.get(a.market_id) is not None]
-        print(f"  [--kalshi-only] {len(results)} of {before} opportunities have Kalshi equivalents.\n")
-        if not results:
-            print("  No Polymarket signals found with Kalshi equivalents.")
-            print("  Try running without --kalshi-only to see all signals.")
-            sys.exit(0)
-
     print()
     print(_bar(f"TOP OPPORTUNITIES  (ranked by Trade Score λ/EIV)  [{len(results)} found]"))
     print()
@@ -440,13 +399,6 @@ def main():
     else:
         for i, a in enumerate(top_n, 1):
             print_opportunity(i, a)
-            if kalshi_matcher:
-                match = kalshi_matches.get(a.market_id)
-                if match:
-                    km, kp, ks = match
-                    print(kalshi_matcher.format_trade(km, kp, ks))
-                else:
-                    print("  KALSHI EQUIVALENT: None found\n")
 
     if len(results) > args.top:
         print(_bar(f"REMAINING {len(results) - args.top} OPPORTUNITIES (compact)"))
@@ -478,10 +430,7 @@ def main():
 
     print("═" * 70)
     print("  Scan complete. Review recommendations before trading.")
-    if args.platform == "kalshi":
-        print("  Note: BUY NO directly on Kalshi for each flagged contract.")
-    else:
-        print("  Note: BUY NO on Polymarket for each flagged contract.")
+    print("  Note: BUY NO on Polymarket for each flagged contract.")
     print("═" * 70)
     print()
 
