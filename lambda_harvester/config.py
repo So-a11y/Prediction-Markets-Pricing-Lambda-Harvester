@@ -48,7 +48,7 @@ LAMBDA_DECAY_GAMMA2 = 0.151   # quadratic term (slows near resolution)
 MIN_DAYS_TO_RESOLUTION = 7          # λ̂ ≈ 0.444 for >7d vs ~0.12 for 1-3d
 PRICE_LOWER_BOUND = 0.05            # avoid boundary artifacts (logit noise)
 PRICE_UPPER_BOUND = 0.50            # longshot focus; FLB strongest below 0.20 but widened for coverage
-MAX_VOLUME_USD = 10_000             # wedge competed away above $10K (Table 14)
+MAX_VOLUME_USD = 25_000             # raised from 10K; Table 14 shows λ≈0 above 10K on average but that pools with >$1M events
 MIN_VOLUME_USD = 100                # minimum liquidity floor
 MIN_PRICE_HISTORY_HOURS = 10       # minimum hourly obs for EIV estimate
 PRICE_HISTORY_HOURS = 48            # lookback window for EIV calculation
@@ -61,6 +61,11 @@ LOW_EDGE_CATEGORIES = {"sports", "politics"}
 MIN_LAMBDA_SIGNAL = 0.15    # minimum λ to flag (below global avg = noise)
 MAX_EIV_THRESHOLD = 0.30    # "quiet market" — low information arrival rate
 MIN_TRADE_SCORE = 0.5       # λ/EIV minimum to generate alert
+
+# ── Execution quality filter ──────────────────────────────────────────────────
+# A spread > 10% means you give up >10 cents per dollar just entering the trade.
+# Ghost markets (spread ~1.0) have Gamma mid-prices that are completely stale.
+MAX_BID_ASK_SPREAD = 0.25
 
 # ── API endpoints ──────────────────────────────────────────────────────────────
 GAMMA_API_BASE = "https://gamma-api.polymarket.com"

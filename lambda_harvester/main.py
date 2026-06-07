@@ -15,6 +15,10 @@ import datetime
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -33,6 +37,7 @@ from lambda_harvester.config import (
     MIN_LAMBDA_SIGNAL,
     MIN_TRADE_SCORE,
     LAMBDA_POLYMARKET,
+    MAX_BID_ASK_SPREAD,
 )
 
 
@@ -423,9 +428,10 @@ def main():
         print()
 
     if args.save_signals:
-        added = save_signals(results, path=signals_path)
-        print(f"  [{added} new signal(s) saved to {signals_path}  "
-              f"(run --check-outcomes later to see P&L)]")
+        added, skipped = save_signals(results, client=client, path=signals_path)
+        print(f"  [{added} new signal(s) saved  |  "
+              f"{skipped} rejected (spread > {MAX_BID_ASK_SPREAD:.0%})  |  "
+              f"file: {signals_path}]")
         print()
 
     print("═" * 70)

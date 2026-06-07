@@ -84,15 +84,13 @@ class PolymarketClient:
     def get_all_active_markets(self, max_markets: int = 2000) -> list[dict]:
         """Paginate through all active markets."""
         all_markets = []
-        limit = 500
+        limit = 100  # API hard-caps pages at 100
         offset = 0
         while len(all_markets) < max_markets:
             batch = self.get_active_markets(limit=limit, offset=offset)
             if not batch:
                 break
             all_markets.extend(batch)
-            if len(batch) < limit:
-                break
             offset += limit
         return all_markets[:max_markets]
 
@@ -244,21 +242,30 @@ class PolymarketClient:
 
     def get_market_mid_price(self, token_id: str) -> Optional[float]:
         """Fetch current best-bid/ask mid-price from CLOB order book."""
-        url = f"{CLOB_API_BASE}/book"
-        params = {"token_id": token_id}
-        data = self._get(url, params)
+        bid, ask = self.get_order_book_top(token_id)
+        if bid is not None and ask is not None:
+            return (bid + ask) / 2
+        return None
+
+    def get_order_book_top(self, token_id: str) -> tuple[Optional[float], Optional[float]]:
+        """Return (yes_bid, yes_ask) from CLOB order book top-of-book.
+
+        YES bid  = highest price a buyer will pay for YES
+        YES ask  = lowest price a seller will accept for YES
+        NO fill  = 1 - yes_bid  (buying NO is equivalent to selling YES at bid)
+        Spread   = yes_ask - yes_bid
+        """
+        data = self._get(f"{CLOB_API_BASE}/book", params={"token_id": token_id})
         if data is None:
-            return None
+            return None, None
         try:
             bids = data.get("bids", [])
             asks = data.get("asks", [])
-            if bids and asks:
-                best_bid = float(bids[0]["price"])
-                best_ask = float(asks[0]["price"])
-                return (best_bid + best_ask) / 2
+            best_bid = float(bids[0]["price"]) if bids else None
+            best_ask = float(asks[0]["price"]) if asks else None
+            return best_bid, best_ask
         except (ValueError, TypeError, KeyError, IndexError):
-            pass
-        return None
+            return None, None
 
     def get_price_history_with_timestamps(
         self,
@@ -297,12 +304,19 @@ class PolymarketClient:
     # ── Resolved markets (for backtesting) ────────────────────────────────────
 
     def get_market_by_id(self, market_id: str) -> Optional[dict]:
-        """Fetch a single market by its condition ID (works for active and resolved)."""
-        data = self._get(f"{GAMMA_API_BASE}/markets", params={"id": market_id})
-        if data is None:
-            return None
-        markets = data if isinstance(data, list) else data.get("markets", [])
-        return markets[0] if markets else None
+        """Fetch a single market by its numeric ID (active or resolved)."""
+        data = self._get(f"{GAMMA_API_BASE}/markets/{market_id}")
+        if data is not None and isinstance(data, dict) and "id" in data:
+            return data
+        # Fallback: search active then closed
+        for closed in ("false", "true"):
+            resp = self._get(f"{GAMMA_API_BASE}/markets", params={"id": market_id, "closed": closed})
+            if resp is None:
+                continue
+            markets = resp if isinstance(resp, list) else resp.get("markets", [])
+            if markets:
+                return markets[0]
+        return None
 
     def get_resolved_markets(self, limit: int = 500, offset: int = 0) -> list[dict]:
         """Fetch resolved (closed) markets from Gamma API."""
