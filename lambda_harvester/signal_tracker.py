@@ -97,6 +97,7 @@ def save_signals(results: list[ContractAnalysis], client=None,
             "spread": spread,
             "liquidity": liquidity,
             "book_available": book_available,
+            "volume_usd": round(a.volume_usd, 2),
             "entry_price": round(entry_price, 6),
             "p_star": round(a.p_star, 6),
             "lambda_contract": round(a.lambda_contract, 6),
@@ -240,20 +241,19 @@ def print_outcomes_report(records: list[dict]):
     # ── Pending trades ─────────────────────────────────────────────────────────
     if pending:
         print(f"── PENDING ({len(pending)} awaiting resolution) ─────────────────────────────────────")
-        print(f"  {'#':>3}  {'Fill':>6}  {'Mid':>6}  {'Sprd':>5}  {'Liq':>6}  "
+        print(f"  {'#':>3}  {'Fill':>6}  {'Vol$':>8}  {'Liq':>6}  "
               f"{'λ':>6}  {'Score':>6}  {'Days':>5}  {'Saved':>10}  Question")
-        print(f"  {'─'*3}  {'─'*6}  {'─'*6}  {'─'*5}  {'─'*6}  "
+        print(f"  {'─'*3}  {'─'*6}  {'─'*8}  {'─'*6}  "
               f"{'─'*6}  {'─'*6}  {'─'*5}  {'─'*10}  {'─'*40}")
         for i, r in enumerate(pending, 1):
             score_str = f"{r['trade_score']:.2f}" if r["trade_score"] is not None else "  N/A"
             saved_dt  = r["saved_at"][:10]
-            mid_str   = f"{r.get('mid_price', r['entry_price']):.3f}"
-            sprd_str  = f"{r['spread']:.3f}" if r.get("spread") is not None else "  N/A"
             liq       = r.get("liquidity", "no_book")
             liq_str   = {"tight": "tight ", "wide": "WIDE  ", "no_book": "no_bk "}.get(liq, liq)
-            print(f"  {i:>3}  {r['entry_price']:>6.3f}  {mid_str}  "
-                  f"{sprd_str:>5}  {liq_str}  {r['lambda_contract']:>6.3f}  "
-                  f"{score_str:>6}  {r['days_at_signal']:>5.1f}  "
+            vol       = r.get("volume_usd")
+            vol_str   = f"${vol:>7,.0f}" if vol is not None else "      N/A"
+            print(f"  {i:>3}  {r['entry_price']:>6.3f}  {vol_str}  {liq_str}  "
+                  f"{r['lambda_contract']:>6.3f}  {score_str:>6}  {r['days_at_signal']:>5.1f}  "
                   f"{saved_dt}  {r['question'][:40]}")
         print()
 
