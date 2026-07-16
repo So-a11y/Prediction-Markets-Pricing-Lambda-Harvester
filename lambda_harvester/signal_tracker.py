@@ -51,6 +51,7 @@ def save_signals(results: list[ContractAnalysis], client=None,
     now = datetime.datetime.utcnow().isoformat(timespec="seconds")
     added = 0
     skipped_spread = 0
+    no_book_count = 0
 
     for a in results:
         if a.market_id in existing_ids:
@@ -80,6 +81,7 @@ def save_signals(results: list[ContractAnalysis], client=None,
 
         if not book_available:
             liquidity = "no_book"
+            no_book_count += 1
         elif spread <= 0.10:
             liquidity = "tight"
         else:
@@ -115,7 +117,7 @@ def save_signals(results: list[ContractAnalysis], client=None,
         added += 1
 
     _save(existing, path)
-    return added, skipped_spread
+    return added, skipped_spread, no_book_count
 
 
 def check_outcomes(client, path: Path = DEFAULT_LOG) -> list[dict]:
@@ -252,9 +254,10 @@ def print_outcomes_report(records: list[dict]):
             liq_str   = {"tight": "tight ", "wide": "WIDE  ", "no_book": "no_bk "}.get(liq, liq)
             vol       = r.get("volume_usd")
             vol_str   = f"${vol:>7,.0f}" if vol is not None else "      N/A"
+            no_book_flag = "  [NO BOOK — unverified fill]" if liq == "no_book" else ""
             print(f"  {i:>3}  {r['entry_price']:>6.3f}  {vol_str}  {liq_str}  "
                   f"{r['lambda_contract']:>6.3f}  {score_str:>6}  {r['days_at_signal']:>5.1f}  "
-                  f"{saved_dt}  {r['question'][:40]}")
+                  f"{saved_dt}  {r['question'][:40]}{no_book_flag}")
         print()
 
     print(f"  Log file: signals_log.json  ({len(records)} total signals tracked)")

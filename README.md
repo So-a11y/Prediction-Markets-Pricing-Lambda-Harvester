@@ -1,6 +1,6 @@
 # λ-Harvesting Bot — Prediction Market Risk Premium Scanner
 
-A quantitative scanner for [Polymarket](https://polymarket.com) and [Kalshi](https://kalshi.com) that identifies contracts where the market price systematically embeds a structural risk premium over the true physical probability — and ranks them by signal strength for **BUY NO** trading.
+A quantitative scanner for [Polymarket](https://polymarket.com) that identifies contracts where the market price systematically embeds a structural risk premium over the true physical probability — and ranks them by signal strength for **BUY NO** trading.
 
 Built on the Wang Transform framework from Yang (2026).
 
@@ -20,7 +20,7 @@ where `p*` is the physical (true) probability and `λ` is the pricing wedge.
 
 **Primary ranking metric**: `Trade Score = λ / EIV`
 
-Yang (2026) finds significant positive λ on Polymarket (λ̂ = 0.176, N=2,460) and Kalshi (λ̂ = 0.187, N=271,699), with the largest wedges in:
+Yang (2026) finds significant positive λ on Polymarket (λ̂ = 0.176, N=2,460), with the largest wedges in:
 - Duration > 7 days (λ̂ = 0.444)
 - Crypto / Science / Tech categories (λ̂ ≈ 0.25–0.28)
 - Volume under $10K (wedge competed away above this)
@@ -37,20 +37,7 @@ cd Prediction-Markets-Pricing-Lambda-Harvester
 pip install -r requirements.txt
 ```
 
-**Credentials** — create a `.env` file in the project root:
-
-```env
-# Kalshi (required only for Kalshi scanning)
-# Option A — RSA key pair (recommended):
-KALSHI_KEY_ID=your-key-id-from-dashboard
-KALSHI_PRIVATE_KEY_PATH=C:\path\to\kalshi_private_key.pem
-
-# Option B — email + password:
-KALSHI_EMAIL=you@example.com
-KALSHI_PASSWORD=yourpassword
-```
-
-Polymarket scanning requires no credentials (public API).
+No credentials required — Polymarket scanning uses the public Gamma API.
 
 ---
 
@@ -59,19 +46,16 @@ Polymarket scanning requires no credentials (public API).
 ### Live scan — find opportunities now
 
 ```bash
-# Scan Polymarket (all categories)
+# Scan all categories
 python -m lambda_harvester.main
 
-# Scan Polymarket, filter to high-edge categories only
+# Filter to highest-edge categories
 python -m lambda_harvester.main --categories crypto,tech,science,other
 
-# Scan Polymarket, show top 10, compact output
+# Show top 10, compact output
 python -m lambda_harvester.main --top 10 --compact
 
-# Scan Kalshi directly
-python -m lambda_harvester.main --platform kalshi
-
-# See a synthetic demo without any API calls
+# Synthetic demo — no API calls
 python -m lambda_harvester.main --demo
 ```
 
@@ -79,7 +63,7 @@ python -m lambda_harvester.main --demo
 
 ```bash
 # Save today's opportunities to signals_log.json
-python -m lambda_harvester.main --categories crypto,tech,science,other --save-signals
+python -m lambda_harvester.main --save-signals
 
 # Check which saved signals have resolved and print P&L
 python -m lambda_harvester.main --check-outcomes
@@ -87,14 +71,30 @@ python -m lambda_harvester.main --check-outcomes
 
 Run `--save-signals` regularly (daily or weekly). Each market is only recorded once — the original entry price is preserved. When markets resolve, `--check-outcomes` fetches the outcome and computes realized P&L.
 
+The signal log now flags `[NO BOOK — unverified fill]` on any signal where the order book was unavailable at save time, so you can weight those entries accordingly in your P&L review.
+
 ### Backtest
 
 ```bash
 # Backtest on 500 resolved Polymarket markets
-python -m lambda_harvester.main --backtest --backtest-markets 500 --platform polymarket
+python -m lambda_harvester.main --backtest --backtest-markets 500
 ```
 
-> **Note**: Polymarket's CLOB API does not serve price history for resolved tokens, so the backtester uses the Wang prior for p* estimation rather than the EMA method. Use forward validation for the most accurate performance measurement.
+> **Note**: Polymarket's CLOB API does not serve price history for resolved tokens, so the backtester uses the Wang prior for p* estimation rather than the EMA method. Use forward validation for the most accurate performance measurement. Once the local price collector has accumulated enough history, it will automatically serve as the EMA source for resolved markets too.
+
+### Local price collector
+
+An hourly collector snapshots current YES prices into a local SQLite database (`price_history.db`). This builds persistent price history independent of Polymarket's API — once a market resolves, the CLOB token disappears, but the local DB retains the full price series for backtesting and EMA estimation.
+
+```bash
+# Collect one snapshot now
+python -m lambda_harvester.price_collector
+
+# Check DB stats
+python -m lambda_harvester.price_collector --stats
+```
+
+**Automated collection (Windows Task Scheduler):** use `run_collector.bat` — the included scheduled task (`PolymarketPriceCollector`) runs this hourly. After ~10 hours of collection per market, the scanner automatically reads local history instead of the CLOB API.
 
 ---
 
@@ -104,7 +104,7 @@ python -m lambda_harvester.main --backtest --backtest-markets 500 --platform pol
 |--------|-------|-----------|
 | Price range | [0.05, 0.50] | Avoid boundary noise; FLB strongest in longshot range |
 | Duration | > 7 days | λ̂ = 0.444 for long-duration contracts (Table 10) |
-| Volume | $0 – $100K | Wedge competed away above ~$10K (Table 14) |
+| Volume | $100 – $25,000 | Wedge competed away above ~$10K (Table 14) |
 | EIV threshold | ≤ 0.30 | Low volatility = structural premium, not informed trading |
 | Min λ | ≥ 0.15 | Below global Polymarket mean = noise |
 | Min trade score | λ/EIV ≥ 0.5 | Minimum signal-to-noise ratio |
@@ -148,11 +148,14 @@ lambda_harvester/
 ├── scanner.py           # Core Wang Transform scanner
 ├── math_engine.py       # λ, EIV, and Wang Transform calculations
 ├── polymarket_client.py # Polymarket Gamma + CLOB API client
-├── kalshi_client.py     # Kalshi REST API client (RSA auth)
-├── kalshi_matcher.py    # Cross-platform market matching
 ├── signal_tracker.py    # Forward validation: save signals, check outcomes
 ├── backtest.py          # Historical backtester
+├── price_collector.py   # Hourly price snapshot collector
+├── price_db.py          # SQLite price history interface
 └── config.py            # Empirical parameters from Yang (2026)
+
+run_scan.bat             # Windows: scheduled daily scan (Task Scheduler)
+run_collector.bat        # Windows: scheduled hourly price collector
 ```
 
 ---

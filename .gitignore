@@ -35,6 +35,17 @@ ENV/
 *.sublime-project
 *.sublime-workspace
 
+# Local price history database
+price_history.db
+*.db
+
+# Log files
+scan_log.txt
+collector_log.txt
+
+# Claude Code config
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

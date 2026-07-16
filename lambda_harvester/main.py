@@ -428,8 +428,9 @@ def main():
         print()
 
     if args.save_signals:
-        added, skipped = save_signals(results, client=client, path=signals_path)
-        print(f"  [{added} new signal(s) saved  |  "
+        added, skipped, no_book = save_signals(results, client=client, path=signals_path)
+        no_book_note = f"  {no_book} no-book (unverified fill)" if no_book else ""
+        print(f"  [{added} new signal(s) saved{no_book_note}  |  "
               f"{skipped} rejected (spread > {MAX_BID_ASK_SPREAD:.0%})  |  "
               f"file: {signals_path}]")
         print()
